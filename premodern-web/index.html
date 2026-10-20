@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Database Carte Premodern - MTG</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#c9a227">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Premodern DB">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+  :root {
+    --bg: #1a1a1d;
+    --panel: #26262b;
+    --panel2: #2f2f36;
+    --border: #3a3a42;
+    --text: #e8e8ea;
+    --muted: #9a9aa5;
+    --accent: #c9a227;
+    --accent2: #e0b84a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+  }
+  header {
+    background: linear-gradient(180deg, #2b2b31, #1f1f24);
+    border-bottom: 2px solid var(--accent);
+    padding: 14px 20px;
+    position: sticky;
+    top: 0;
+    z-index: 50;
+  }
+  header h1 { margin: 0 0 2px; font-size: 20px; letter-spacing: .3px; }
+  header .sub { color: var(--muted); font-size: 12px; }
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 14px 20px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 60px;
+    z-index: 40;
+  }
+  .ctrl { display: flex; flex-direction: column; gap: 3px; }
+  .ctrl label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+  input[type="text"], select {
+    background: var(--panel2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 7px 9px;
+    font-size: 13px;
+    outline: none;
+  }
+  input[type="text"]:focus, select:focus { border-color: var(--accent); }
+  #q { min-width: 260px; }
+  .colors { display: flex; gap: 4px; align-items: center; }
+  .cbtn {
+    width: 30px; height: 30px; border-radius: 50%;
+    border: 2px solid var(--border); cursor: pointer;
+    font-weight: bold; display: flex; align-items: center; justify-content: center;
+    user-select: none; font-size: 13px;
+  }
+  .cbtn.active { border-color: var(--accent2); box-shadow: 0 0 0 2px var(--accent2); }
+  .c-W { background: #f8f6d8; color: #333; }
+  .c-U { background: #aae0fa; color: #0a3b5c; }
+  .c-B { background: #cbc2bf; color: #1a1a1a; }
+  .c-R { background: #f9aa8f; color: #5c1a0a; }
+  .c-G { background: #9bd3ae; color: #0a3b1a; }
+  .c-C { background: #ccc2c0; color: #333; }
+  .btn {
+    background: var(--accent); color: #1a1a1d; border: none;
+    border-radius: 5px; padding: 8px 14px; cursor: pointer; font-weight: 600;
+    align-self: flex-end;
+  }
+  .btn.secondary { background: var(--panel2); color: var(--text); border: 1px solid var(--border); }
+  .count { padding: 10px 20px; color: var(--muted); font-size: 13px; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 14px;
+    padding: 0 20px 40px;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .card .imgwrap {
+    background: #111;
+    aspect-ratio: 488 / 680;
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden;
+  }
+  .card .imgwrap img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .card .imgwrap .noimg { color: var(--muted); font-size: 12px; padding: 20px; text-align: center; }
+  .card .body { padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+  .card .nm { font-weight: 700; font-size: 15px; line-height: 1.2; }
+  .card .nm_it { color: var(--accent2); font-size: 12px; font-style: italic; }
+  .card .meta { color: var(--muted); font-size: 12px; }
+  .card .typeline { font-size: 12px; color: #cfcfd6; }
+  .card .pt { font-weight: 700; color: var(--accent2); }
+  .card .rules { font-size: 12px; line-height: 1.35; white-space: pre-wrap; color: #d6d6dc; }
+  .card .rules_it { font-size: 12px; line-height: 1.35; white-space: pre-wrap; color: #b9c4b0; border-top: 1px dashed var(--border); padding-top: 5px; }
+  .pill {
+    display: inline-block; font-size: 10px; text-transform: uppercase;
+    letter-spacing: .4px; padding: 2px 6px; border-radius: 4px;
+    background: var(--panel2); color: var(--muted); border: 1px solid var(--border);
+  }
+  .pill.rare { color: #e0b84a; border-color: #6a5a1a; }
+  .pill.uncommon { color: #cfd6e0; border-color: #4a5566; }
+  .pill.common { color: #cfcfd6; }
+  .mana { font-weight: 600; }
+  .loading { padding: 40px 20px; font-size: 15px; }
+  .toggle-it { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 5px; align-self: flex-end; cursor: pointer; }
+  a.srclink { color: var(--accent2); font-size: 11px; text-decoration: none; }
+  a.srclink:hover { text-decoration: underline; }
+  mark { background: var(--accent2); color: #1a1a1d; padding: 0 1px; border-radius: 2px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Database Carte Premodern</h1>
+  <div class="sub">Alpha &rarr; Scourge + Unglued + Portal/Starter &bull; terre base escluse &bull; ogni carta una sola volta</div>
+</header>
+
+<div class="controls">
+  <div class="ctrl">
+    <label>Ricerca (nome o testo)</label>
+    <input type="text" id="q" placeholder="es. flying, goblin, trample, Shivan...">
+  </div>
+  <div class="ctrl">
+    <label>Cerca in</label>
+    <select id="scope">
+      <option value="all">Nome + Testo</option>
+      <option value="name">Solo nome</option>
+      <option value="text">Solo testo</option>
+    </select>
+  </div>
+  <div class="ctrl">
+    <label>Tipo</label>
+    <select id="fType"><option value="">(tutti)</option></select>
+  </div>
+  <div class="ctrl">
+    <label>Sottotipo</label>
+    <select id="fSub"><option value="">(tutti)</option></select>
+  </div>
+  <div class="ctrl">
+    <label>Rarit&agrave;</label>
+    <select id="fRar">
+      <option value="">(tutte)</option>
+      <option value="common">Comune</option>
+      <option value="uncommon">Non comune</option>
+      <option value="rare">Rara</option>
+    </select>
+  </div>
+  <div class="ctrl">
+    <label>Colore</label>
+    <div class="colors" id="colors">
+      <div class="cbtn c-W" data-c="W" title="Bianco">W</div>
+      <div class="cbtn c-U" data-c="U" title="Blu">U</div>
+      <div class="cbtn c-B" data-c="B" title="Nero">B</div>
+      <div class="cbtn c-R" data-c="R" title="Rosso">R</div>
+      <div class="cbtn c-G" data-c="G" title="Verde">G</div>
+      <div class="cbtn c-C" data-c="C" title="Incolore">C</div>
+    </div>
+  </div>
+  <div class="ctrl">
+    <label>Modo colore</label>
+    <select id="colorMode">
+      <option value="any">Almeno uno</option>
+      <option value="exact">Esatto</option>
+      <option value="only">Solo questi</option>
+    </select>
+  </div>
+  <button class="btn secondary" id="reset">Azzera filtri</button>
+  <label class="toggle-it"><input type="checkbox" id="showIt" checked> Mostra italiano</label>
+</div>
+
+<div class="count" id="count">Caricamento...</div>
+<div class="grid" id="grid"></div>
+<div class="loading" id="loading">Caricamento del database...</div>
+
+<script>
+let ALL = [];
+let colorFilter = new Set();
+
+const el = id => document.getElementById(id);
+
+async function load() {
+  try {
+    const res = await fetch('premodern_cards.json');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    ALL = await res.json();
+  } catch (e) {
+    el('loading').textContent =
+      'Impossibile caricare premodern_cards.json. ' +
+      'Apri questo file dalla stessa cartella del JSON. Dettaglio: ' + e.message;
+    return;
+  }
+  el('loading').style.display = 'none';
+  buildTypeFilters();
+  bindEvents();
+  render();
+}
+
+function buildTypeFilters() {
+  const types = new Set();
+  const subs = new Set();
+  for (const c of ALL) {
+    (c.tipo || '').split(' ').forEach(t => { if (t && t !== '//') types.add(t); });
+    (c.sottotipo || '').split(' ').forEach(s => { if (s) subs.add(s); });
+  }
+  const tSel = el('fType');
+  [...types].sort().forEach(t => {
+    const o = document.createElement('option'); o.value = t; o.textContent = t; tSel.appendChild(o);
+  });
+  const sSel = el('fSub');
+  [...subs].sort().forEach(s => {
+    const o = document.createElement('option'); o.value = s; o.textContent = s; sSel.appendChild(o);
+  });
+}
+
+function bindEvents() {
+  ['q', 'scope', 'fType', 'fSub', 'fRar', 'colorMode'].forEach(id =>
+    el(id).addEventListener('input', render));
+  el('showIt').addEventListener('change', render);
+  el('reset').addEventListener('click', () => {
+    el('q').value = ''; el('scope').value = 'all';
+    el('fType').value = ''; el('fSub').value = ''; el('fRar').value = '';
+    el('colorMode').value = 'any';
+    colorFilter.clear();
+    document.querySelectorAll('.cbtn').forEach(b => b.classList.remove('active'));
+    render();
+  });
+  document.querySelectorAll('.cbtn').forEach(b => {
+    b.addEventListener('click', () => {
+      const c = b.dataset.c;
+      if (colorFilter.has(c)) { colorFilter.delete(c); b.classList.remove('active'); }
+      else { colorFilter.add(c); b.classList.add('active'); }
+      render();
+    });
+  });
+}
+
+function matchesColor(card) {
+  if (colorFilter.size === 0) return true;
+  const cardColors = new Set((card.colori || '').split('').filter(Boolean));
+  const mode = el('colorMode').value;
+  const sel = colorFilter;
+  const wantC = sel.has('C'); // incolore
+  if (mode === 'any') {
+    if (wantC && cardColors.size === 0) return true;
+    for (const c of sel) { if (c !== 'C' && cardColors.has(c)) return true; }
+    return false;
+  }
+  if (mode === 'exact') {
+    const selColored = [...sel].filter(c => c !== 'C');
+    if (wantC) {
+      // deve essere incolore e nessun colore selezionato (oltre a C)
+      return cardColors.size === 0 && selColored.length === 0;
+    }
+    if (cardColors.size !== selColored.length) return false;
+    return selColored.every(c => cardColors.has(c));
+  }
+  if (mode === 'only') {
+    // tutti i colori della carta devono stare nella selezione
+    if (wantC && cardColors.size === 0) return true;
+    for (const c of cardColors) { if (!sel.has(c)) return false; }
+    return cardColors.size > 0 || wantC;
+  }
+  return true;
+}
+
+function esc(s) {
+  return (s || '').replace(/[&<>"]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]));
+}
+function highlight(text, q) {
+  if (!q) return esc(text);
+  const safe = esc(text);
+  try {
+    const re = new RegExp('(' + q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
+    return safe.replace(re, '<mark>$1</mark>');
+  } catch { return safe; }
+}
+
+function render() {
+  const q = el('q').value.trim().toLowerCase();
+  const scope = el('scope').value;
+  const fType = el('fType').value;
+  const fSub = el('fSub').value;
+  const fRar = el('fRar').value;
+  const showIt = el('showIt').checked;
+
+  const out = ALL.filter(c => {
+    if (fType && !((c.tipo || '').split(' ').includes(fType))) return false;
+    if (fSub && !((c.sottotipo || '').split(' ').includes(fSub))) return false;
+    if (fRar && c.rarita !== fRar) return false;
+    if (!matchesColor(c)) return false;
+    if (q) {
+      const inName = (c.nome || '').toLowerCase().includes(q) ||
+                     (c.nome_it || '').toLowerCase().includes(q);
+      const inText = (c.testo || '').toLowerCase().includes(q) ||
+                     (c.testo_it || '').toLowerCase().includes(q);
+      if (scope === 'name' && !inName) return false;
+      if (scope === 'text' && !inText) return false;
+      if (scope === 'all' && !inName && !inText) return false;
+    }
+    return true;
+  });
+
+  el('count').textContent = out.length + ' carte trovate (su ' + ALL.length + ')';
+
+  const grid = el('grid');
+  grid.innerHTML = '';
+  const frag = document.createDocumentFragment();
+  // limita il rendering per performance; mostra avviso se troppi
+  const LIMIT = 600;
+  const slice = out.slice(0, LIMIT);
+  for (const c of slice) {
+    frag.appendChild(cardNode(c, q, showIt));
+  }
+  grid.appendChild(frag);
+  if (out.length > LIMIT) {
+    const more = document.createElement('div');
+    more.className = 'count';
+    more.style.gridColumn = '1 / -1';
+    more.textContent = 'Mostrate le prime ' + LIMIT + '. Affina la ricerca per vederne altre.';
+    grid.appendChild(more);
+  }
+}
+
+function cardNode(c, q, showIt) {
+  const div = document.createElement('div');
+  div.className = 'card';
+
+  const imgwrap = document.createElement('div');
+  imgwrap.className = 'imgwrap';
+  if (c.url_immagine) {
+    const img = document.createElement('img');
+    img.loading = 'lazy';
+    img.src = c.url_immagine;
+    img.alt = c.nome;
+    img.onerror = () => { imgwrap.innerHTML = '<div class="noimg">' + esc(c.nome) + '</div>'; };
+    imgwrap.appendChild(img);
+  } else {
+    imgwrap.innerHTML = '<div class="noimg">' + esc(c.nome) + '</div>';
+  }
+  div.appendChild(imgwrap);
+
+  const body = document.createElement('div');
+  body.className = 'body';
+
+  const nm = document.createElement('div');
+  nm.className = 'nm';
+  nm.innerHTML = highlight(c.nome, q);
+  body.appendChild(nm);
+
+  if (showIt && c.nome_it) {
+    const nmit = document.createElement('div');
+    nmit.className = 'nm_it';
+    nmit.innerHTML = highlight(c.nome_it, q);
+    body.appendChild(nmit);
+  }
+
+  const meta = document.createElement('div');
+  meta.className = 'meta';
+  const mana = c.costo_mana ? '<span class="mana">' + esc(c.costo_mana) + '</span>' : '';
+  const rar = c.rarita ? ' <span class="pill ' + c.rarita + '">' + esc(c.rarita_it || c.rarita) + '</span>' : '';
+  meta.innerHTML = mana + rar;
+  body.appendChild(meta);
+
+  const tl = document.createElement('div');
+  tl.className = 'typeline';
+  let ptStr = '';
+  if (c.forza !== '' || c.costituzione !== '') {
+    ptStr = ' <span class="pt">' + esc(c.forza) + '/' + esc(c.costituzione) + '</span>';
+  }
+  tl.innerHTML = esc(c.type_line) + ptStr;
+  body.appendChild(tl);
+
+  if (c.testo) {
+    const rules = document.createElement('div');
+    rules.className = 'rules';
+    rules.innerHTML = highlight(c.testo, q);
+    body.appendChild(rules);
+  }
+
+  if (showIt && c.testo_it) {
+    const rit = document.createElement('div');
+    rit.className = 'rules_it';
+    rit.innerHTML = highlight(c.testo_it, q);
+    body.appendChild(rit);
+  }
+
+  if (c.url_scryfall) {
+    const a = document.createElement('a');
+    a.className = 'srclink';
+    a.href = c.url_scryfall; a.target = '_blank'; a.rel = 'noopener';
+    a.textContent = 'Scryfall \u2197';
+    body.appendChild(a);
+  }
+
+  div.appendChild(body);
+  return div;
+}
+
+load();
+
+// Registrazione del service worker per il funzionamento offline (PWA).
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => { /* silenzioso */ });
+  });
+}
+</script>
+</body>
+</html>
