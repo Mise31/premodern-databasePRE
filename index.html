@@ -168,6 +168,18 @@
     </select>
   </div>
   <div class="ctrl">
+    <label>Set</label>
+    <select id="fSet"><option value="">(tutti)</option></select>
+  </div>
+  <div class="ctrl">
+    <label>Carte mostrate</label>
+    <select id="fLimit">
+      <option value="200">200</option>
+      <option value="600" selected>600</option>
+      <option value="all">Tutte</option>
+    </select>
+  </div>
+  <div class="ctrl">
     <label>Colore</label>
     <div class="colors" id="colors">
       <div class="cbtn c-W" data-c="W" title="Bianco">W</div>
@@ -198,6 +210,42 @@
 let ALL = [];
 let colorFilter = new Set();
 
+// Nomi dei set (codici Scryfall) in ordine di uscita.
+// Il set di ogni carta e' ricavato da url_scryfall (es. /card/tmp/107/...).
+const SET_NAMES = [
+  ['lea', 'Limited Edition Alpha'], ['leb', 'Limited Edition Beta'],
+  ['2ed', 'Unlimited Edition'], ['arn', 'Arabian Nights'], ['atq', 'Antiquities'],
+  ['3ed', 'Revised Edition'], ['leg', 'Legends'], ['drk', 'The Dark'],
+  ['fem', 'Fallen Empires'], ['4ed', 'Fourth Edition'], ['ice', 'Ice Age'],
+  ['chr', 'Chronicles'], ['hml', 'Homelands'], ['all', 'Alliances'],
+  ['mir', 'Mirage'], ['vis', 'Visions'], ['5ed', 'Fifth Edition'],
+  ['por', 'Portal'], ['wth', 'Weatherlight'], ['tmp', 'Tempest'],
+  ['sth', 'Stronghold'], ['p02', 'Portal Second Age'], ['exo', 'Exodus'],
+  ['ugl', 'Unglued'], ['usg', "Urza's Saga"], ['ulg', "Urza's Legacy"],
+  ['6ed', 'Classic Sixth Edition'], ['ptk', 'Portal Three Kingdoms'],
+  ['uds', "Urza's Destiny"], ['s99', 'Starter 1999'], ['mmq', 'Mercadian Masques'],
+  ['nem', 'Nemesis'], ['s00', 'Starter 2000'], ['pcy', 'Prophecy'],
+  ['inv', 'Invasion'], ['pls', 'Planeshift'], ['7ed', 'Seventh Edition'],
+  ['apc', 'Apocalypse'], ['ody', 'Odyssey'], ['tor', 'Torment'],
+  ['jud', 'Judgment'], ['ons', 'Onslaught'], ['lgn', 'Legions'], ['scg', 'Scourge'],
+];
+const SET_NAME = Object.fromEntries(SET_NAMES);
+const SET_ORDER = Object.fromEntries(SET_NAMES.map(([code], i) => [code, i]));
+
+const RARITY_IT = { common: 'comune', uncommon: 'non comune', rare: 'rara', special: 'speciale' };
+
+function setCodeOf(card) {
+  const m = /\/card\/([^/]+)\//.exec(card.url_scryfall || '');
+  return m ? m[1].toLowerCase() : '';
+}
+function collectorOf(url) {
+  const m = /\/card\/[^/]+\/([^/]+)\//.exec(url || '');
+  return m ? decodeURIComponent(m[1]) : '';
+}
+function setLabel(code) {
+  return (SET_NAME[code] || code.toUpperCase()) + ' (' + code.toUpperCase() + ')';
+}
+
 const el = id => document.getElementById(id);
 
 async function load() {
@@ -211,8 +259,36 @@ async function load() {
       'Apri questo file dalla stessa cartella del JSON. Dettaglio: ' + e.message;
     return;
   }
+  // Stampe di ogni carta in tutti i set (file opzionale: senza, si usa solo la stampa base).
+  let stampe = {};
+  try {
+    const res2 = await fetch('premodern_stampe.json');
+    if (res2.ok) stampe = await res2.json();
+  } catch (e) { /* si continua con la sola stampa base */ }
+
   el('loading').style.display = 'none';
+  for (const c of ALL) {
+    c.set = setCodeOf(c);
+    // set -> lista di stampe { set, rarita, url_scryfall, url_immagine, numero }
+    // (piu' voci nello stesso set = varianti, es. Fallen Empires, Homelands)
+    c.stampe = new Map();
+    const add = p => {
+      if (!c.stampe.has(p.set)) c.stampe.set(p.set, []);
+      c.stampe.get(p.set).push(p);
+    };
+    const lista = stampe[c.nome] || [];
+    for (const [set, rarita, url_scryfall, url_immagine, numero] of lista) {
+      add({ set, rarita, url_scryfall, url_immagine, numero: numero || '' });
+    }
+    // Stampa base: aggiunta solo se il file delle stampe non la contiene gia'.
+    const baseUrl = (c.url_scryfall || '').split('?')[0];
+    if (c.set && !lista.some(p => p[2] === baseUrl)) {
+      add({ set: c.set, rarita: c.rarita, url_scryfall: c.url_scryfall,
+        url_immagine: c.url_immagine, numero: collectorOf(c.url_scryfall) });
+    }
+  }
   buildTypeFilters();
+  buildSetFilter();
   bindEvents();
   render();
 }
@@ -234,13 +310,34 @@ function buildTypeFilters() {
   });
 }
 
+function buildSetFilter() {
+  // Conta tutte le stampe di ogni set (ristampe e varianti comprese).
+  const counts = new Map();
+  for (const c of ALL) {
+    for (const [set, lista] of c.stampe) counts.set(set, (counts.get(set) || 0) + lista.length);
+  }
+  // Ordine di uscita; i codici non in elenco vanno in fondo, in ordine alfabetico.
+  const codes = [...counts.keys()].sort((a, b) => {
+    const oa = SET_ORDER[a] ?? 9999, ob = SET_ORDER[b] ?? 9999;
+    return oa !== ob ? oa - ob : a.localeCompare(b);
+  });
+  const sel = el('fSet');
+  for (const code of codes) {
+    const o = document.createElement('option');
+    o.value = code;
+    o.textContent = setLabel(code) + ' \u2014 ' + counts.get(code);
+    sel.appendChild(o);
+  }
+}
+
 function bindEvents() {
-  ['q', 'scope', 'fType', 'fSub', 'fRar', 'colorMode'].forEach(id =>
+  ['q', 'scope', 'fType', 'fSub', 'fRar', 'fSet', 'fLimit', 'colorMode'].forEach(id =>
     el(id).addEventListener('input', render));
   el('showIt').addEventListener('change', render);
   el('reset').addEventListener('click', () => {
     el('q').value = ''; el('scope').value = 'all';
     el('fType').value = ''; el('fSub').value = ''; el('fRar').value = '';
+    el('fSet').value = '';
     el('colorMode').value = 'any';
     colorFilter.clear();
     document.querySelectorAll('.cbtn').forEach(b => b.classList.remove('active'));
@@ -303,9 +400,25 @@ function render() {
   const fType = el('fType').value;
   const fSub = el('fSub').value;
   const fRar = el('fRar').value;
+  const fSet = el('fSet').value;
   const showIt = el('showIt').checked;
 
-  const out = ALL.filter(c => {
+  // Senza set: una carta sola, con la sua stampa base.
+  // Con un set: tutte le carte stampate in quel set, mostrate con la stampa di quel set
+  // (immagine, link e rarita' di quella stampa).
+  // Le varianti dello stesso set compaiono come carte separate.
+  const src = fSet
+    ? ALL.filter(c => c.stampe.has(fSet)).flatMap(c => {
+        const lista = c.stampe.get(fSet);
+        return lista.map(p => Object.assign({}, c, {
+          set: p.set, rarita: p.rarita, rarita_it: RARITY_IT[p.rarita] || p.rarita,
+          url_scryfall: p.url_scryfall, url_immagine: p.url_immagine,
+          numero: lista.length > 1 ? p.numero : '',
+        }));
+      })
+    : ALL;
+
+  const out = src.filter(c => {
     if (fType && !((c.tipo || '').split(' ').includes(fType))) return false;
     if (fSub && !((c.sottotipo || '').split(' ').includes(fSub))) return false;
     if (fRar && c.rarita !== fRar) return false;
@@ -322,13 +435,15 @@ function render() {
     return true;
   });
 
-  el('count').textContent = out.length + ' carte trovate (su ' + ALL.length + ')';
+  el('count').textContent = out.length + ' carte trovate (su ' + src.length +
+    (fSet ? ' del set ' + setLabel(fSet) : '') + ')';
 
   const grid = el('grid');
   grid.innerHTML = '';
   const frag = document.createDocumentFragment();
-  // limita il rendering per performance; mostra avviso se troppi
-  const LIMIT = 600;
+  // limita il rendering per performance (200 / 600 / tutte); mostra avviso se troppi
+  const limVal = el('fLimit').value;
+  const LIMIT = limVal === 'all' ? Infinity : parseInt(limVal, 10);
   const slice = out.slice(0, LIMIT);
   for (const c of slice) {
     frag.appendChild(cardNode(c, q, showIt));
@@ -380,7 +495,10 @@ function cardNode(c, q, showIt) {
   meta.className = 'meta';
   const mana = c.costo_mana ? '<span class="mana">' + esc(c.costo_mana) + '</span>' : '';
   const rar = c.rarita ? ' <span class="pill ' + c.rarita + '">' + esc(c.rarita_it || c.rarita) + '</span>' : '';
-  meta.innerHTML = mana + rar;
+  // Con le varianti mostra anche il numero di collezione (es. "FEM #31a").
+  const setTxt = c.set ? c.set.toUpperCase() + (c.numero ? ' #' + c.numero : '') : '';
+  const set = c.set ? ' <span class="pill" title="' + esc(SET_NAME[c.set] || c.set) + '">' + esc(setTxt) + '</span>' : '';
+  meta.innerHTML = mana + rar + set;
   body.appendChild(meta);
 
   const tl = document.createElement('div');

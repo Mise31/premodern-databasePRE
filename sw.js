@@ -5,7 +5,7 @@
      cosi' una volta viste restano disponibili anche offline.
    Alza CACHE_VERSION quando aggiorni i file per forzare il refresh. */
 
-const CACHE_VERSION = 'premodern-v1';
+const CACHE_VERSION = 'premodern-v4';
 const CORE_CACHE = CACHE_VERSION + '-core';
 const IMG_CACHE = CACHE_VERSION + '-img';
 
@@ -13,6 +13,7 @@ const CORE_ASSETS = [
   './',
   './index.html',
   './premodern_cards.json',
+  './premodern_stampe.json',
   './manifest.webmanifest',
   './icon-192.png',
   './icon-512.png',
