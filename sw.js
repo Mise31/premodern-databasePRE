@@ -1,11 +1,13 @@
 /* Service Worker per Premodern MTG Database (PWA).
    Strategia:
-   - App shell (html, json, icone): cache-first, cosi' funziona offline.
+   - App shell (html, json, icone): network-first, cosi' online si vede sempre
+     l'ultima versione e offline si usa la copia salvata.
    - Immagini carte da Scryfall (cards.scryfall.io): stale-while-revalidate,
      cosi' una volta viste restano disponibili anche offline.
-   Alza CACHE_VERSION quando aggiorni i file per forzare il refresh. */
+   Con il network-first non serve piu' alzare CACHE_VERSION a ogni modifica;
+   alzala solo se cambi l'elenco CORE_ASSETS o la logica di questo file. */
 
-const CACHE_VERSION = 'premodern-v4';
+const CACHE_VERSION = 'premodern-v6';
 const CORE_CACHE = CACHE_VERSION + '-core';
 const IMG_CACHE = CACHE_VERSION + '-img';
 
@@ -43,6 +45,9 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(req.url);
 
+  // API di Scryfall (prezzi): sempre dalla rete, mai in cache, cosi' i prezzi sono attuali.
+  if (url.hostname === 'api.scryfall.com') return;
+
   // Immagini delle carte da Scryfall: stale-while-revalidate.
   if (url.hostname.endsWith('scryfall.io') || url.hostname.endsWith('scryfall.com')) {
     event.respondWith(
@@ -58,19 +63,21 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // App shell e tutto il resto della stessa origine: cache-first con fallback rete.
+  // App shell e tutto il resto della stessa origine: network-first.
+  // Online si prende sempre la versione aggiornata (e si salva in cache);
+  // offline si usa la copia salvata.
   if (url.origin === self.location.origin) {
     event.respondWith(
-      caches.match(req).then((cached) => {
-        if (cached) return cached;
-        return fetch(req).then((res) => {
-          if (res && res.status === 200) {
-            const copy = res.clone();
-            caches.open(CORE_CACHE).then((cache) => cache.put(req, copy));
-          }
-          return res;
-        }).catch(() => cached);
-      })
+      fetch(req).then((res) => {
+        if (res && res.status === 200) {
+          const copy = res.clone();
+          caches.open(CORE_CACHE).then((cache) => cache.put(req, copy));
+        }
+        return res;
+      }).catch(() =>
+        caches.match(req, { ignoreSearch: true }).then((cached) =>
+          cached || (req.mode === 'navigate' ? caches.match('./index.html') : undefined))
+      )
     );
   }
 });

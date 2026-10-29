@@ -129,15 +129,88 @@
   a.srclink { color: var(--accent2); font-size: 11px; text-decoration: none; }
   a.srclink:hover { text-decoration: underline; }
   mark { background: var(--accent2); color: #1a1a1d; padding: 0 1px; border-radius: 2px; }
+
+  /* Pannello filtri richiudibile */
+  header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .filters-btn {
+    background: var(--accent); color: #1a1a1d; border: none; border-radius: 5px;
+    padding: 8px 14px; cursor: pointer; font-weight: 700; font-size: 13px; white-space: nowrap;
+  }
+  .filters-btn .badge {
+    display: inline-block; min-width: 18px; padding: 0 5px; margin-left: 4px;
+    border-radius: 9px; background: #1a1a1d; color: var(--accent2); font-size: 11px;
+  }
+  .controls.collapsed { display: none; }
+  .controls.opening { animation: slideDown .2s ease-out; }
+  @keyframes slideDown { from { opacity: 0; transform: translateY(-12px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { .controls.opening { animation: none; } }
+
+  /* Carta cliccabile + stella preferiti */
+  .card { position: relative; cursor: pointer; }
+  .card:focus-visible { outline: 2px solid var(--accent2); outline-offset: 2px; }
+  .fav {
+    position: absolute; top: 6px; right: 6px; z-index: 2;
+    width: 34px; height: 34px; border-radius: 50%;
+    background: rgba(0, 0, 0, .65); color: #cfcfd6;
+    border: 1px solid var(--border); font-size: 19px; line-height: 1;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+  }
+  .fav.on { color: var(--accent2); border-color: var(--accent2); }
+  .fav:focus-visible { outline: 2px solid var(--accent2); }
+  .pill.banned { color: #fff; background: #a3262a; border-color: #d04040; }
+  .toggle-fav { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 5px; align-self: flex-end; cursor: pointer; }
+
+  /* Vista ingrandita (finestra) */
+  .modal-bg {
+    position: fixed; inset: 0; z-index: 100; background: rgba(0, 0, 0, .78);
+    display: none; align-items: center; justify-content: center; padding: 16px;
+  }
+  .modal-bg.open { display: flex; }
+  .modal {
+    position: relative; background: var(--panel); border: 1px solid var(--border);
+    border-radius: 10px; width: 100%; max-width: 920px; max-height: 92vh; overflow: auto;
+    display: flex; gap: 18px; padding: 18px;
+  }
+  .modal .mimg { flex: 0 0 340px; }
+  .modal .mimg img { width: 100%; border-radius: 14px; display: block; }
+  .modal .minfo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; padding-right: 28px; }
+  .modal h2 { margin: 0; font-size: 20px; }
+  .modal .sec { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin-top: 6px; }
+  .mclose {
+    position: absolute; top: 8px; right: 8px; width: 34px; height: 34px; border-radius: 50%;
+    background: var(--panel2); color: var(--text); border: 1px solid var(--border);
+    font-size: 18px; cursor: pointer;
+  }
+  .prints { display: flex; flex-wrap: wrap; gap: 5px; }
+  .prints button {
+    background: var(--panel2); color: var(--text); border: 1px solid var(--border);
+    border-radius: 4px; padding: 3px 7px; font-size: 11px; cursor: pointer;
+  }
+  .prints button.cur { border-color: var(--accent2); color: var(--accent2); }
+  .price-box { background: var(--panel2); border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; font-size: 13px; line-height: 1.6; }
+  .price-box .note { color: var(--muted); font-size: 11px; }
+  .modal-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .modal-actions a { color: var(--accent2); font-size: 12px; }
+  body.noscroll { overflow: hidden; }
+  @media (max-width: 720px) {
+    .modal { flex-direction: column; }
+    .modal .mimg { flex: none; width: 100%; max-width: 340px; margin: 0 auto; }
+    .modal .minfo { padding-right: 0; }
+  }
 </style>
 </head>
 <body>
 <header>
-  <h1>Database Carte Premodern</h1>
-  <div class="sub">Alpha &rarr; Scourge + Unglued + Portal/Starter &bull; terre base escluse &bull; ogni carta una sola volta</div>
+  <div>
+    <h1>Database Carte Premodern</h1>
+    <div class="sub">Alpha &rarr; Scourge + Unglued + Portal/Starter &bull; terre base escluse &bull; ogni carta una sola volta</div>
+  </div>
+  <button class="filters-btn" id="toggleFilters" aria-controls="controls" aria-expanded="true">
+    Nascondi filtri &#9650;
+  </button>
 </header>
 
-<div class="controls">
+<div class="controls" id="controls">
   <div class="ctrl">
     <label>Ricerca (nome o testo)</label>
     <input type="text" id="q" placeholder="es. flying, goblin, trample, Shivan...">
@@ -168,8 +241,45 @@
     </select>
   </div>
   <div class="ctrl">
+    <label>Supertipo</label>
+    <select id="fSuper"><option value="">(tutti)</option></select>
+  </div>
+  <div class="ctrl">
+    <label>Costo (CMC)</label>
+    <select id="fCmc">
+      <option value="">(tutti)</option>
+      <option value="0">0</option>
+      <option value="1">1</option>
+      <option value="2">2</option>
+      <option value="3">3</option>
+      <option value="4">4</option>
+      <option value="5">5</option>
+      <option value="6">6</option>
+      <option value="7">7 o pi&ugrave;</option>
+    </select>
+  </div>
+  <div class="ctrl">
     <label>Set</label>
     <select id="fSet"><option value="">(tutti)</option></select>
+  </div>
+  <div class="ctrl">
+    <label>Legalit&agrave;</label>
+    <select id="fLegal">
+      <option value="">(tutte)</option>
+      <option value="legal">Solo legali</option>
+      <option value="banned">Solo bandite</option>
+    </select>
+  </div>
+  <div class="ctrl">
+    <label>Ordina per</label>
+    <select id="sortBy">
+      <option value="name">Nome</option>
+      <option value="cmc">Costo (crescente)</option>
+      <option value="cmc_desc">Costo (decrescente)</option>
+      <option value="color">Colore</option>
+      <option value="rarity">Rarit&agrave; (rare prima)</option>
+      <option value="set">Set (data di uscita)</option>
+    </select>
   </div>
   <div class="ctrl">
     <label>Carte mostrate</label>
@@ -200,11 +310,38 @@
   </div>
   <button class="btn secondary" id="reset">Azzera filtri</button>
   <label class="toggle-it"><input type="checkbox" id="showIt" checked> Mostra italiano</label>
+  <label class="toggle-fav"><input type="checkbox" id="onlyFav"> Solo preferiti &#9733;</label>
+  <button class="btn" id="closeFilters">Mostra le carte &#9650;</button>
 </div>
 
 <div class="count" id="count">Caricamento...</div>
 <div class="grid" id="grid"></div>
 <div class="loading" id="loading">Caricamento del database...</div>
+
+<!-- Vista ingrandita della carta -->
+<div class="modal-bg" id="modalBg">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="mName">
+    <button class="mclose" id="mClose" aria-label="Chiudi">&times;</button>
+    <div class="mimg"><img id="mImg" alt=""></div>
+    <div class="minfo">
+      <h2 id="mName"></h2>
+      <div class="nm_it" id="mNameIt"></div>
+      <div class="meta" id="mMeta"></div>
+      <div class="typeline" id="mType"></div>
+      <div class="rules" id="mText"></div>
+      <div class="rules_it" id="mTextIt"></div>
+      <div class="sec">Prezzo attuale (stampa selezionata)</div>
+      <div class="price-box" id="mPrice"></div>
+      <div class="sec" id="mPrintsTitle">Stampe</div>
+      <div class="prints" id="mPrints"></div>
+      <div class="modal-actions">
+        <button class="btn secondary" id="mFav"></button>
+        <a id="mScry" target="_blank" rel="noopener">Scryfall &#8599;</a>
+        <a id="mCm" target="_blank" rel="noopener">Cardmarket &#8599;</a>
+      </div>
+    </div>
+  </div>
+</div>
 
 <script>
 let ALL = [];
@@ -233,6 +370,32 @@ const SET_NAME = Object.fromEntries(SET_NAMES);
 const SET_ORDER = Object.fromEntries(SET_NAMES.map(([code], i) => [code, i]));
 
 const RARITY_IT = { common: 'comune', uncommon: 'non comune', rare: 'rara', special: 'speciale' };
+const RARITY_RANK = { rare: 0, special: 1, uncommon: 2, common: 3 };
+const SUPER_IT = { Legendary: 'Leggendario', World: 'Mondiale', Snow: 'Neve', Basic: 'Base' };
+
+// Lista bandite Premodern (fonte: premodernmagic.com / Scryfall, aggiornata a gennaio 2026,
+// ultima modifica: Parallax Tide). Da aggiornare a mano se la lista cambia.
+const BANNED = new Set([
+  'Amulet of Quoz', 'Balance', 'Brainstorm', 'Bronze Tablet', 'Channel',
+  'Demonic Consultation', 'Earthcraft', 'Entomb', 'Flash', 'Force of Will',
+  'Goblin Recruiter', 'Grim Monolith', 'Jeweled Bird', 'Land Tax', 'Mana Vault',
+  'Memory Jar', "Mind's Desire", 'Mind Twist', 'Mystical Tutor', 'Necropotence',
+  'Parallax Tide', 'Rebirth', 'Strip Mine', 'Tempest Efreet', 'Tendrils of Agony',
+  'Time Spiral', 'Timmerian Fiends', 'Tolarian Academy', 'Vampiric Tutor', 'Windfall',
+  'Worldgorger Dragon', "Yawgmoth's Bargain", "Yawgmoth's Will",
+]);
+
+// Preferiti: salvati nel browser (per nome carta).
+const FAV_KEY = 'premodern-preferiti';
+let FAV = new Set();
+try { FAV = new Set(JSON.parse(localStorage.getItem(FAV_KEY) || '[]')); } catch { FAV = new Set(); }
+function saveFav() {
+  try { localStorage.setItem(FAV_KEY, JSON.stringify([...FAV])); } catch { /* spazio pieno o bloccato */ }
+}
+function toggleFav(name) {
+  if (FAV.has(name)) FAV.delete(name); else FAV.add(name);
+  saveFav();
+}
 
 function setCodeOf(card) {
   const m = /\/card\/([^/]+)\//.exec(card.url_scryfall || '');
@@ -286,10 +449,16 @@ async function load() {
       add({ set: c.set, rarita: c.rarita, url_scryfall: c.url_scryfall,
         url_immagine: c.url_immagine, numero: collectorOf(c.url_scryfall) });
     }
+    // Stampa mostrata nella vista normale (quella del database).
+    const delSet = c.stampe.get(c.set) || [];
+    c.stampa = delSet.find(p => (p.url_scryfall || '').split('?')[0] === baseUrl) || delSet[0] || null;
+    c.bandita = BANNED.has(c.nome);
   }
   buildTypeFilters();
   buildSetFilter();
   bindEvents();
+  bindFiltersPanel();
+  bindModal();
   render();
 }
 
@@ -308,6 +477,18 @@ function buildTypeFilters() {
   [...subs].sort().forEach(s => {
     const o = document.createElement('option'); o.value = s; o.textContent = s; sSel.appendChild(o);
   });
+  // Supertipi presenti nel database (es. Legendary, World) + "nessuno".
+  const supers = new Set();
+  for (const c of ALL) (c.supertipo || '').split(' ').forEach(s => { if (s) supers.add(s); });
+  const spSel = el('fSuper');
+  [...supers].sort().forEach(s => {
+    const o = document.createElement('option');
+    o.value = s; o.textContent = s + (SUPER_IT[s] ? ' (' + SUPER_IT[s] + ')' : '');
+    spSel.appendChild(o);
+  });
+  const none = document.createElement('option');
+  none.value = '-'; none.textContent = '(nessuno)';
+  spSel.appendChild(none);
 }
 
 function buildSetFilter() {
@@ -330,13 +511,62 @@ function buildSetFilter() {
   }
 }
 
+/* ---------- Pannello filtri richiudibile ---------- */
+const FILTERS_KEY = 'premodern-filtri-aperti';
+
+function setFiltersOpen(open) {
+  const panel = el('controls');
+  panel.classList.toggle('collapsed', !open);
+  panel.classList.remove('opening');
+  if (open) { void panel.offsetWidth; panel.classList.add('opening'); }
+  el('toggleFilters').setAttribute('aria-expanded', open ? 'true' : 'false');
+  try { localStorage.setItem(FILTERS_KEY, open ? '1' : '0'); } catch { /* ignorato */ }
+  paintFiltersBtn();
+}
+
+// Numero di filtri attivi, mostrato sul pulsante quando il pannello e' chiuso.
+function activeFilterCount() {
+  let n = 0;
+  if (el('q').value.trim()) n++;
+  ['fType', 'fSub', 'fRar', 'fSuper', 'fCmc', 'fSet', 'fLegal'].forEach(id => { if (el(id).value) n++; });
+  if (colorFilter.size) n++;
+  if (el('onlyFav').checked) n++;
+  return n;
+}
+
+function paintFiltersBtn() {
+  const open = !el('controls').classList.contains('collapsed');
+  const n = activeFilterCount();
+  const badge = n ? ' <span class="badge" aria-label="' + n + ' filtri attivi">' + n + '</span>' : '';
+  el('toggleFilters').innerHTML = open ? 'Nascondi filtri &#9650;' : 'Filtri &#9660;' + badge;
+}
+
+function bindFiltersPanel() {
+  el('toggleFilters').addEventListener('click', () =>
+    setFiltersOpen(el('controls').classList.contains('collapsed')));
+  el('closeFilters').addEventListener('click', () => {
+    setFiltersOpen(false);
+    window.scrollTo({ top: 0 });
+  });
+  let saved = null;
+  try { saved = localStorage.getItem(FILTERS_KEY); } catch { /* ignorato */ }
+  setFiltersOpen(saved !== '0');
+  // Il pannello resta agganciato sotto l'intestazione, qualunque sia la sua altezza.
+  const fixTop = () => { el('controls').style.top = document.querySelector('header').offsetHeight + 'px'; };
+  fixTop();
+  window.addEventListener('resize', fixTop);
+}
+
 function bindEvents() {
-  ['q', 'scope', 'fType', 'fSub', 'fRar', 'fSet', 'fLimit', 'colorMode'].forEach(id =>
-    el(id).addEventListener('input', render));
+  ['q', 'scope', 'fType', 'fSub', 'fRar', 'fSuper', 'fCmc', 'fSet', 'fLegal', 'sortBy',
+   'fLimit', 'colorMode'].forEach(id => el(id).addEventListener('input', render));
   el('showIt').addEventListener('change', render);
+  el('onlyFav').addEventListener('change', render);
   el('reset').addEventListener('click', () => {
     el('q').value = ''; el('scope').value = 'all';
     el('fType').value = ''; el('fSub').value = ''; el('fRar').value = '';
+    el('fSuper').value = ''; el('fCmc').value = ''; el('fLegal').value = '';
+    el('onlyFav').checked = false;
     el('fSet').value = '';
     el('colorMode').value = 'any';
     colorFilter.clear();
@@ -394,6 +624,28 @@ function highlight(text, q) {
   } catch { return safe; }
 }
 
+// Ordine colori: W U B R G, poi multicolore, poi incolore.
+function colorRank(c) {
+  const cols = (c.colori || '').split('').filter(Boolean);
+  if (cols.length === 0) return 6;
+  if (cols.length > 1) return 5;
+  return 'WUBRG'.indexOf(cols[0]);
+}
+function byName(a, b) { return (a.nome || '').localeCompare(b.nome || ''); }
+function sortCards(list, how) {
+  const cmp = {
+    name: byName,
+    cmc: (a, b) => (Number(a.cmc) || 0) - (Number(b.cmc) || 0) || byName(a, b),
+    cmc_desc: (a, b) => (Number(b.cmc) || 0) - (Number(a.cmc) || 0) || byName(a, b),
+    color: (a, b) => colorRank(a) - colorRank(b) || byName(a, b),
+    rarity: (a, b) => (RARITY_RANK[a.rarita] ?? 9) - (RARITY_RANK[b.rarita] ?? 9) || byName(a, b),
+    set: (a, b) => (SET_ORDER[a.set] ?? 9999) - (SET_ORDER[b.set] ?? 9999) ||
+      String(a.stampa ? a.stampa.numero : '').localeCompare(String(b.stampa ? b.stampa.numero : ''), undefined, { numeric: true }) ||
+      byName(a, b),
+  }[how] || byName;
+  list.sort(cmp);
+}
+
 function render() {
   const q = el('q').value.trim().toLowerCase();
   const scope = el('scope').value;
@@ -401,6 +653,11 @@ function render() {
   const fSub = el('fSub').value;
   const fRar = el('fRar').value;
   const fSet = el('fSet').value;
+  const fSuper = el('fSuper').value;
+  const fCmc = el('fCmc').value;
+  const fLegal = el('fLegal').value;
+  const onlyFav = el('onlyFav').checked;
+  const sortBy = el('sortBy').value;
   const showIt = el('showIt').checked;
 
   // Senza set: una carta sola, con la sua stampa base.
@@ -414,6 +671,7 @@ function render() {
           set: p.set, rarita: p.rarita, rarita_it: RARITY_IT[p.rarita] || p.rarita,
           url_scryfall: p.url_scryfall, url_immagine: p.url_immagine,
           numero: lista.length > 1 ? p.numero : '',
+          stampa: p,
         }));
       })
     : ALL;
@@ -422,6 +680,17 @@ function render() {
     if (fType && !((c.tipo || '').split(' ').includes(fType))) return false;
     if (fSub && !((c.sottotipo || '').split(' ').includes(fSub))) return false;
     if (fRar && c.rarita !== fRar) return false;
+    if (fSuper) {
+      const sup = (c.supertipo || '').split(' ').filter(Boolean);
+      if (fSuper === '-' ? sup.length > 0 : !sup.includes(fSuper)) return false;
+    }
+    if (fCmc !== '') {
+      const cmc = Math.floor(Number(c.cmc) || 0);
+      if (fCmc === '7' ? cmc < 7 : cmc !== Number(fCmc)) return false;
+    }
+    if (fLegal === 'legal' && c.bandita) return false;
+    if (fLegal === 'banned' && !c.bandita) return false;
+    if (onlyFav && !FAV.has(c.nome)) return false;
     if (!matchesColor(c)) return false;
     if (q) {
       const inName = (c.nome || '').toLowerCase().includes(q) ||
@@ -434,6 +703,9 @@ function render() {
     }
     return true;
   });
+
+  sortCards(out, sortBy);
+  paintFiltersBtn();
 
   el('count').textContent = out.length + ' carte trovate (su ' + src.length +
     (fSet ? ' del set ' + setLabel(fSet) : '') + ')';
@@ -461,6 +733,33 @@ function render() {
 function cardNode(c, q, showIt) {
   const div = document.createElement('div');
   div.className = 'card';
+  div.tabIndex = 0;
+  div.setAttribute('role', 'button');
+  div.setAttribute('aria-label', 'Apri ' + c.nome);
+  div.addEventListener('click', () => openModal(c));
+  div.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openModal(c); }
+  });
+
+  // Stella preferiti (non apre la finestra).
+  const star = document.createElement('button');
+  star.className = 'fav';
+  const paintStar = () => {
+    const on = FAV.has(c.nome);
+    star.classList.toggle('on', on);
+    star.textContent = on ? '\u2605' : '\u2606';
+    star.setAttribute('aria-pressed', on ? 'true' : 'false');
+    star.setAttribute('aria-label', on ? 'Togli dai preferiti' : 'Aggiungi ai preferiti');
+    star.title = star.getAttribute('aria-label');
+  };
+  paintStar();
+  star.addEventListener('click', e => {
+    e.stopPropagation();
+    toggleFav(c.nome);
+    if (el('onlyFav').checked) render(); else paintStar();
+  });
+  star.addEventListener('keydown', e => e.stopPropagation());
+  div.appendChild(star);
 
   const imgwrap = document.createElement('div');
   imgwrap.className = 'imgwrap';
@@ -498,7 +797,8 @@ function cardNode(c, q, showIt) {
   // Con le varianti mostra anche il numero di collezione (es. "FEM #31a").
   const setTxt = c.set ? c.set.toUpperCase() + (c.numero ? ' #' + c.numero : '') : '';
   const set = c.set ? ' <span class="pill" title="' + esc(SET_NAME[c.set] || c.set) + '">' + esc(setTxt) + '</span>' : '';
-  meta.innerHTML = mana + rar + set;
+  const ban = c.bandita ? ' <span class="pill banned" title="Bandita in Premodern">Bandita</span>' : '';
+  meta.innerHTML = mana + rar + set + ban;
   body.appendChild(meta);
 
   const tl = document.createElement('div');
@@ -529,11 +829,152 @@ function cardNode(c, q, showIt) {
     a.className = 'srclink';
     a.href = c.url_scryfall; a.target = '_blank'; a.rel = 'noopener';
     a.textContent = 'Scryfall \u2197';
+    a.addEventListener('click', e => e.stopPropagation());
     body.appendChild(a);
   }
 
   div.appendChild(body);
   return div;
+}
+
+/* ---------- Vista ingrandita + prezzi ---------- */
+
+let modalCard = null;     // carta aperta
+let modalPrint = null;    // stampa mostrata
+let lastFocus = null;     // elemento da rifocalizzare alla chiusura
+const PRICE_CACHE = new Map(); // "set/numero" -> dati prezzo (per la sessione)
+
+function bindModal() {
+  el('mClose').addEventListener('click', closeModal);
+  el('modalBg').addEventListener('click', e => { if (e.target === el('modalBg')) closeModal(); });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && el('modalBg').classList.contains('open')) closeModal();
+  });
+  el('mFav').addEventListener('click', () => {
+    if (!modalCard) return;
+    toggleFav(modalCard.nome);
+    paintModalFav();
+    render();
+  });
+}
+
+function paintModalFav() {
+  const on = FAV.has(modalCard.nome);
+  el('mFav').textContent = on ? '\u2605 Nei preferiti' : '\u2606 Aggiungi ai preferiti';
+  el('mFav').setAttribute('aria-pressed', on ? 'true' : 'false');
+}
+
+function largeImg(url) { return (url || '').replace('/normal/', '/large/'); }
+
+function printLabel(p, multi) {
+  return p.set.toUpperCase() + (multi && p.numero ? ' #' + p.numero : '');
+}
+
+function openModal(c) {
+  // c puo' essere una "vista" di una stampa: si risale alla carta originale.
+  const base = ALL.find(x => x.nome === c.nome) || c;
+  modalCard = base;
+  lastFocus = document.activeElement;
+  const showIt = el('showIt').checked;
+
+  el('mName').textContent = base.nome;
+  el('mNameIt').textContent = showIt && base.nome_it ? base.nome_it : '';
+  let pt = '';
+  if (base.forza !== '' || base.costituzione !== '') pt = '  ' + base.forza + '/' + base.costituzione;
+  el('mType').textContent = (base.type_line || '') + pt;
+  el('mText').textContent = base.testo || '';
+  el('mTextIt').textContent = showIt && base.testo_it && base.testo_it !== base.testo ? base.testo_it : '';
+  el('mTextIt').style.display = el('mTextIt').textContent ? '' : 'none';
+
+  // Elenco di tutte le stampe, in ordine di uscita.
+  const all = [];
+  for (const lista of base.stampe.values()) for (const p of lista) all.push(p);
+  all.sort((a, b) => (SET_ORDER[a.set] ?? 9999) - (SET_ORDER[b.set] ?? 9999) ||
+    String(a.numero).localeCompare(String(b.numero), undefined, { numeric: true }));
+  const nSet = base.stampe.size;
+  el('mPrintsTitle').textContent = 'Stampe (' + all.length + ' in ' + nSet + (nSet === 1 ? ' set)' : ' set)');
+  const box = el('mPrints');
+  box.innerHTML = '';
+  for (const p of all) {
+    const b = document.createElement('button');
+    const multi = (base.stampe.get(p.set) || []).length > 1;
+    b.textContent = printLabel(p, multi);
+    b.title = (SET_NAME[p.set] || p.set) + (RARITY_IT[p.rarita] ? ' \u2014 ' + RARITY_IT[p.rarita] : '');
+    b.addEventListener('click', () => showPrint(p));
+    p._btn = b;
+    box.appendChild(b);
+  }
+
+  paintModalFav();
+  showPrint(c.stampa || base.stampa || all[0]);
+
+  el('modalBg').classList.add('open');
+  document.body.classList.add('noscroll');
+  el('mClose').focus();
+}
+
+function showPrint(p) {
+  if (!p) return;
+  modalPrint = p;
+  const base = modalCard;
+  el('mImg').src = largeImg(p.url_immagine);
+  el('mImg').alt = base.nome + ' (' + (SET_NAME[p.set] || p.set) + ')';
+  const multi = (base.stampe.get(p.set) || []).length > 1;
+  const mana = base.costo_mana ? '<span class="mana">' + esc(base.costo_mana) + '</span> ' : '';
+  el('mMeta').innerHTML = mana +
+    '<span class="pill ' + esc(p.rarita) + '">' + esc(RARITY_IT[p.rarita] || p.rarita) + '</span> ' +
+    '<span class="pill">' + esc(setLabel(p.set)) + (multi && p.numero ? ' #' + esc(p.numero) : '') + '</span>' +
+    (base.bandita ? ' <span class="pill banned">Bandita in Premodern</span>' : '');
+  el('mScry').href = p.url_scryfall || base.url_scryfall;
+  for (const lista of base.stampe.values()) for (const x of lista) {
+    if (x._btn) x._btn.classList.toggle('cur', x === p);
+  }
+  loadPrice(p);
+}
+
+function fmtEur(v) {
+  return v == null ? '\u2014' : Number(v).toLocaleString('it-IT', { style: 'currency', currency: 'EUR' });
+}
+function fmtUsd(v) {
+  return v == null ? '\u2014' : Number(v).toLocaleString('it-IT', { style: 'currency', currency: 'USD' });
+}
+
+async function loadPrice(p) {
+  const box = el('mPrice');
+  const cm = el('mCm');
+  cm.style.display = 'none';
+  if (!p.numero) { box.innerHTML = 'Prezzo non disponibile per questa stampa.'; return; }
+  const key = p.set + '/' + p.numero;
+  box.innerHTML = 'Caricamento prezzo\u2026';
+  try {
+    let d = PRICE_CACHE.get(key);
+    if (!d) {
+      const res = await fetch('https://api.scryfall.com/cards/' + encodeURIComponent(p.set) + '/' +
+        encodeURIComponent(p.numero), { headers: { Accept: 'application/json' } });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const j = await res.json();
+      d = { prices: j.prices || {}, cardmarket: (j.purchase_uris || {}).cardmarket || '' };
+      PRICE_CACHE.set(key, d);
+    }
+    if (modalPrint !== p) return; // nel frattempo e' stata scelta un'altra stampa
+    const pr = d.prices;
+    box.innerHTML =
+      'Cardmarket (EUR): <b>' + fmtEur(pr.eur) + '</b>' + (pr.eur_foil ? ' &middot; foil ' + fmtEur(pr.eur_foil) : '') + '<br>' +
+      'TCGplayer (USD): <b>' + fmtUsd(pr.usd) + '</b>' + (pr.usd_foil ? ' &middot; foil ' + fmtUsd(pr.usd_foil) : '') + '<br>' +
+      '<span class="note">Fonte: Scryfall, prezzi medi aggiornati circa una volta al giorno. "\u2014" = nessun dato.</span>';
+    if (d.cardmarket) { cm.href = d.cardmarket; cm.style.display = ''; }
+  } catch (e) {
+    if (modalPrint !== p) return;
+    box.innerHTML = 'Prezzo non disponibile (serve la connessione a internet).';
+  }
+}
+
+function closeModal() {
+  el('modalBg').classList.remove('open');
+  document.body.classList.remove('noscroll');
+  el('mImg').removeAttribute('src');
+  modalCard = null; modalPrint = null;
+  if (lastFocus && lastFocus.focus) lastFocus.focus();
 }
 
 load();
